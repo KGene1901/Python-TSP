@@ -274,32 +274,31 @@ added_note = ""
 ############
 
 def getHeuristic(neighbourList, tour):
-    smallestDist = float('inf')
+    smallestDist = 1000000000000
     for neighbourDist in neighbourList:
         if neighbourList.index(neighbourDist) in tour:
             continue
-        if neighbourDist < smallestDist:
+        if neighbourDist <= smallestDist:
             smallestDist = neighbourDist
+            
     return smallestDist
 
 def choose_next_best_city(fringe):
     smallestFxCity = ''
     smallestFx = float('inf')
     for city in fringe:
-        if city[5] < smallestFx:
-            smallestFx = city[5]
+        if city[4] < smallestFx:
+            smallestFx = city[4]
             smallestFxCity = city
     return smallestFxCity
 
 def a_star_search(start_city, num_cities, dist_matrix):
     newId = start_city
-    states = ['-']*num_cities
     parents = ['-']*num_cities
     actions = [0]*num_cities
     pathCost = [0]*num_cities
-    depth = [0]*num_cities
     evalFunc = [float('inf')]*num_cities
-    cityNode = (newId, states[0], parents[0], actions[0], pathCost[0], depth[0], evalFunc[0])
+    cityNode = (newId, parents[0], actions[0], pathCost[0], evalFunc[0])
     fringe = [cityNode]
     tour = [start_city]
     
@@ -326,7 +325,6 @@ def a_star_search(start_city, num_cities, dist_matrix):
                     continue
                 if not isHeuristicsCalculated:
                     heuristic = getHeuristic(dist_matrix[desired_city[0]], tour)
-                    print(heuristic)
                     isHeuristicsCalculated = True
                     
                 newId = nextPotentialCity
@@ -334,39 +332,37 @@ def a_star_search(start_city, num_cities, dist_matrix):
                 actions[newId] = dist_matrix[desired_city[0]][newId]
                 pathCost[newId] = pathCost[desired_city[0]] + actions[newId]
                 evalFunc[newId] = pathCost[newId] + heuristic # f(z) = g(z) + h(z)
-                depth[newId] = depth[desired_city[0]] + 1
-                cityNode = (newId, parents[newId], actions[newId], pathCost[newId], depth[newId], evalFunc[newId])
+                cityNode = (newId, parents[newId], actions[newId], pathCost[newId], evalFunc[newId])
                 fringe.append(cityNode)
 
             desired_city = choose_next_best_city(fringe)
             evalFunc = [float('inf')]*num_cities
             tour.append(desired_city[0])
-            print(f'\n{tour}')
     
-    return tour, desired_city[4]+dist_matrix[desired_city[0]][start_city]
+    return tour, desired_city[3]+dist_matrix[desired_city[0]][start_city]
 
-tour, tour_length = a_star_search(3, num_cities, dist_matrix)
-print(tour) 
+# tour, tour_length = a_star_search(2, num_cities, dist_matrix)
+# print(tour, tour_length) 
+# print(dist_matrix)
 
-# def compare(num_cities, dist_matrix):
-#     shortest_tour_path = []
-#     shortest_tour_length = float('inf')
+def compare(num_cities, dist_matrix):
+    shortest_tour_path = []
+    shortest_tour_length = 1000000000000000
 
-#     for city in range(num_cities):
-#         print(city)
-#         tour, tour_length = a_star_search(city, num_cities, dist_matrix)
-#         if tour_length < shortest_tour_length:
-#            shortest_tour_length = tour_length
-#            shortest_tour_path = tour
+    for city in range(num_cities):
+        tour, tour_length = a_star_search(city, num_cities, dist_matrix)
+        if tour_length < shortest_tour_length:
+           shortest_tour_length = tour_length
+           shortest_tour_path = tour
     
-#     return shortest_tour_path, shortest_tour_length
+    return shortest_tour_path, shortest_tour_length
 
-# start = time.time()
-# tour, tour_length = compare(num_cities, dist_matrix)
-# end = time.time()
+start = time.time()
+tour, tour_length = compare(num_cities, dist_matrix)
+end = time.time()
 
-# print(tour, tour_length)
-# print('Time taken: {}'.format(end-start))
+print(f'Best tour: {tour}\nTour length: {tour_length}')
+print(f'Time taken: {end-start}')
 
 ############
 ############ YOUR CODE SHOULD NOW BE COMPLETE AND WHEN EXECUTION OF THIS PROGRAM 'skeleton.py'
