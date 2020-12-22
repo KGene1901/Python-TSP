@@ -275,35 +275,53 @@ added_note = ""
 ############ NOW YOUR CODE SHOULD BEGIN.
 ############
 
-# def best_first_search(start_city, num_cities, dist_matrix):
-#     tour = [] 
-#     tour_length = 0
-#     tour.append(start_city)
-#     current_city = start_city
-#     flag = True
+def best_first_search(start_city, num_cities, dist_matrix):
+    tour = [] 
+    tour_length = 0
+    tour.append(start_city)
+    current_city = start_city
+    flag = True
 
-#     while flag:
-#         shortest_dist = 100000000
-#         shortest_dist_city = -1
+    while flag:
+        shortest_dist = 100000000
+        shortest_dist_city = -1
 
-#         for destination in range (num_cities):
-#             if destination not in tour:
-#                 if (dist_matrix[current_city][destination] <= shortest_dist):
-#                     shortest_dist = dist_matrix[current_city][destination]
-#                     shortest_dist_city = destination
+        for destination in range (num_cities):
+            if destination not in tour:
+                if (dist_matrix[current_city][destination] <= shortest_dist):
+                    shortest_dist = dist_matrix[current_city][destination]
+                    shortest_dist_city = destination
                 
-#         tour_length += shortest_dist
-#         tour.append(shortest_dist_city)
-#         current_city = shortest_dist_city
+        tour_length += shortest_dist
+        tour.append(shortest_dist_city)
+        current_city = shortest_dist_city
 
-#         if len(tour) == num_cities:
-#             flag = False
+        if len(tour) == num_cities:
+            flag = False
 
-#     return_dist = dist_matrix[tour[len(tour)-1]][tour[0]]
-#     tour_length += return_dist 
+    return_dist = dist_matrix[tour[len(tour)-1]][tour[0]]
+    tour_length += return_dist 
     
-#     return tour, tour_length
+    return tour, tour_length
 
+def compare(num_cities, dist_matrix):
+    shortest_tour_path = []
+    shortest_tour_length = 1000000000000000
+
+    for city in range(num_cities):
+        tour, tour_length = best_first_search(city, num_cities, dist_matrix)
+        if tour_length < shortest_tour_length:
+           shortest_tour_length = tour_length
+           shortest_tour_path = tour
+    
+    return shortest_tour_path, shortest_tour_length
+
+start = time.time()
+tour, tour_length = compare(num_cities, dist_matrix)
+end = time.time()
+
+print(f'Best tour: {tour}\nTour length: {tour_length}')
+print(f'Time taken: {end-start}')
 
 ############
 ############ YOUR CODE SHOULD NOW BE COMPLETE AND WHEN EXECUTION OF THIS PROGRAM 'skeleton.py'
