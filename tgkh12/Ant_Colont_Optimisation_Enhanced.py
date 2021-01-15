@@ -12,6 +12,8 @@ import os
 import sys
 import time
 import random
+from collections import defaultdict
+import math
 
 ############
 ############ NOW PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -145,7 +147,7 @@ def read_in_algorithm_codes_and_tariffs(alg_codes_file):
 ############ THE CITY FILE IS IN THE FOLDER 'city-files'.
 ############
 
-input_file = "AISearchfile012.txt"
+input_file = "AISearchfile048.txt"
 
 ############
 ############ PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -249,7 +251,7 @@ my_last_name = "Leong"
 ############ 'alg_codes_and_tariffs.txt' (READ THIS FILE TO SEE THE CODES).
 ############
 
-algorithm_code = "SA"
+algorithm_code = "AC"
 
 ############
 ############ DO NOT TOUCH OR ALTER THE CODE BELOW! YOU HAVE BEEN WARNED!
@@ -268,29 +270,187 @@ print("   your algorithm code is legal and is " + algorithm_code + " -" + code_d
 ############ YOUR TOUR THAT YOU MIGHT BE INTERESTED IN LATER.
 ############
 
-added_note = ""
+added_note = "Rank-based AS + 2-opt"
 
 ############
 ############ NOW YOUR CODE SHOULD BEGIN.
 ############
 
+def nearestNeighbour(dist_matrix, num_cities, start_city):
+    tour = [start_city]
+    tour_length = 0
+    current_city = start_city
+    
+    while len(tour) != num_cities:
+        shortest_dist = float('inf')
+        for neighbour in range(len(dist_matrix[current_city])):
+            if neighbour in tour:
+                continue
+            if dist_matrix[current_city][neighbour] < shortest_dist:
+                shortest_dist = dist_matrix[current_city][neighbour]
+                next_city = neighbour
+
+        tour.append(next_city)
+        tour_length += dist_matrix[current_city][next_city]
+        current_city = next_city
+
+    return tour_length
+
+def probability(i, candidate_tour, dist_matrix, num_cities, pheromone_levels):
+    alpha = 1
+    # beta = 2 # between 2 and 5 is recommended
+    beta = 5
+    numerator = 0
+    denominator = 0
+    probability_to_next_city = [0]*num_cities
+
+    for j in range(num_cities): # j is next possible city
+        if j in candidate_tour: # ignores visited cities
+            continue
+        if dist_matrix[i][j] == 0:
+            cost = 1
+        else:
+            cost = dist_matrix[i][j]
+        numerator = (pheromone_levels[i][j]**alpha) * ((1/cost)**beta)
+        for m in range(num_cities):
+            if m in candidate_tour or m == i:
+                continue
+            if dist_matrix[i][m] == 0:
+                cost = 1
+            else:
+                cost = dist_matrix[i][m]
+            denominator += (pheromone_levels[i][m]**alpha) * ((1/cost)**beta)
+        probability_to_next_city[j] = numerator / denominator
+
+    return probability_to_next_city
+
+def getTourLength(tour, dist_matrix, num_cities):
+    edge_count = 1
+    city1 = 0
+    city2 = 1
+    tour_length = 0
+    while edge_count <= num_cities-1:
+        tour_length += dist_matrix[tour[city1]][tour[city2]]
+        edge_count += 1
+        city1 += 1
+        city2 += 1
+
+    return tour_length + dist_matrix[tour[city2-1]][tour[0]]
+
+def two_opt_local_search(tour, tour_length, dist_matrix, num_cities):
+    best_tour = tour
+    best_tour_length = tour_length
+    is_improve = True
+    while is_improve:
+        is_improve = False
+        for i in range(1, len(tour) - 2):
+            for j in range(i+1, len(tour)):
+                if j - i == 1:
+                    continue
+                new_tour = tour[:]
+                new_tour[i:j] = tour[j-1:i-1:-1]
+                new_tour_length = getTourLength(new_tour, dist_matrix, num_cities)
+                if new_tour_length < best_tour_length:
+                    best_tour = new_tour
+                    best_tour_length = new_tour_length
+                    is_improve = True
+
+        tour = best_tour
+
+    return best_tour, best_tour_length
+
+def ACO(dist_matrix, num_cities, max_it, num_of_ant, nnTourLen):
+    ## Initialising parameters ##
+    phi = 0.1
+    w = 6
+    # if num_cities < 50:
+    #     w = 6
+    # else:
+    #     w = 3
+    tau_0 = 0.5*w*(w-1)/(phi*nnTourLen)
+    pheromone_levels = [[tau_0]*num_cities]*num_cities
+    best_tour = []
+    best_tour_length = sys.maxsize
+    #############################
+
+    ## Main loop ##
+    t = 0
+    try:
+        while t < max_it:
+            candidate_tours = defaultdict(list)
+            candidate_tour_distances = defaultdict()
+            count = 0
+            ## Building tours for each ant ##
+            for k in range(num_of_ant):
+                if count >= num_cities:
+                    count = 0
+                candidate_tour = [count]
+                candidate_tour_len = 0
+                i = count # i is current city
+                while(len(candidate_tour) < num_cities):
+                    probability_to_next_city = probability(i, candidate_tour, dist_matrix, num_cities, pheromone_levels)
+                    largest_prob = max(probability_to_next_city)
+                    next_city = list(probability_to_next_city).index(largest_prob)
+                    candidate_tour.append(next_city)
+                    candidate_tour_len += dist_matrix[i][next_city]
+                    pheromone_levels[i][next_city] = ((1-phi)*pheromone_levels[i][next_city]) + (phi*tau_0)
+                    i = next_city
+                pheromone_levels[i][candidate_tour[0]] = ((1-phi)*pheromone_levels[i][candidate_tour[0]]) + (phi*tau_0)
+                candidate_tour_len += dist_matrix[i][candidate_tour[0]] # adding on distance from final city to start city
+                candidate_tours[k] = candidate_tour
+                candidate_tour_distances[k] = candidate_tour_len
+                count+=1
+            #################################
+            ## Uses 2-opt to further optimise tour ##
+            sorted_distances = sorted((value, key) for (key, value) in candidate_tour_distances.items()) # format [(distance, tour_num)]
+            top_ranking_ants = sorted_distances[0:w-1]
+            for ant in top_ranking_ants:
+                current_best_tour, current_best_tour_len = two_opt_local_search(candidate_tours[ant[1]], ant[0], dist_matrix, num_cities)
+                top_ranking_ants[top_ranking_ants.index(ant)] = (current_best_tour_len, ant[1])
+                candidate_tour_distances[ant[1]] = current_best_tour_len
+                candidate_tours[ant[1]] = current_best_tour
+                if current_best_tour_len < best_tour_length:
+                    best_tour_length = current_best_tour_len
+                    best_tour = current_best_tour
+            #########################################
+
+            ## deposit/evaporate pheromone on edges ##
+            for m in range(len(pheromone_levels)):
+                for n in range(len(pheromone_levels[m])):
+                    overall_change_in_pheromone = 0
+                    edge_in_best_tour = 0
+                    if m == n:
+                        continue
+                    count = 1
+                    for r in range(len(top_ranking_ants)):
+                        tour_r = top_ranking_ants[r][1]
+                        # check if edge exists in r-th ant's tour
+                        if candidate_tours[tour_r].index(n) - candidate_tours[tour_r].index(m) == 1:
+                            overall_change_in_pheromone += ((w-count)*(1/candidate_tour_distances[tour_r]))
+                            if candidate_tours[tour_r] == best_tour:
+                                edge_in_best_tour = 1/best_tour_length
+                        count+=1
+
+                    pheromone_levels[m][n] = (1-phi)*pheromone_levels[m][n] + overall_change_in_pheromone + (w*edge_in_best_tour)
+
+            t += 1
+
+        return best_tour, best_tour_length
+
+    except:
+        return best_tour, best_tour_length
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+nnTourLen = nearestNeighbour(dist_matrix, num_cities, 0)
+# if num_cities < 50:
+#     num_of_ant = num_cities
+#     max_it = 22
+# else:
+#     num_of_ant = 45
+#     max_it = 3
+num_of_ant = num_cities
+max_it = 200
+tour, tour_length = ACO(dist_matrix, num_cities, max_it, num_of_ant, nnTourLen) # for submission
 
 ############
 ############ YOUR CODE SHOULD NOW BE COMPLETE AND WHEN EXECUTION OF THIS PROGRAM 'skeleton.py'

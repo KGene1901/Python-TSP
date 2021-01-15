@@ -12,6 +12,8 @@ import os
 import sys
 import time
 import random
+from collections import defaultdict
+import copy
 
 ############
 ############ NOW PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -145,7 +147,7 @@ def read_in_algorithm_codes_and_tariffs(alg_codes_file):
 ############ THE CITY FILE IS IN THE FOLDER 'city-files'.
 ############
 
-input_file = "AISearchfile012.txt"
+input_file = "AISearchfile048.txt"
 
 ############
 ############ PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -249,7 +251,7 @@ my_last_name = "Leong"
 ############ 'alg_codes_and_tariffs.txt' (READ THIS FILE TO SEE THE CODES).
 ############
 
-algorithm_code = "SA"
+algorithm_code = "CA"
 
 ############
 ############ DO NOT TOUCH OR ALTER THE CODE BELOW! YOU HAVE BEEN WARNED!
@@ -274,22 +276,168 @@ added_note = ""
 ############ NOW YOUR CODE SHOULD BEGIN.
 ############
 
+'''
+Steps for Christofides Alg:
 
+Find a minimum spanning tree (T)
+Find vertexes in T with odd degree (O)
+Find minimum weight matching (M) edges to T
+Build an Eulerian circuit using the edges of M and T
+Make a Hamiltonian circuit by skipping repeated vertexes
+'''
 
+def isValidEdge(city1, city2, vertexInMST): 
+    if city1 == city2: 
+        return 0
+    if (vertexInMST[city1] == 0 and vertexInMST[city2] == 0) or (vertexInMST[city1] == 1 and vertexInMST[city2] == 1): 
+        return 0
+    return 1
+  
+def primMST(dist_matrix, num_cities): 
+    mst_connections = defaultdict(list)
+    vertexInMST = [0] * num_cities 
+    vertexInMST[0] = 1
+    num_of_edges_added = 0
+    while num_of_edges_added < num_cities-1: 
+        min_dist = sys.maxsize
+        from_city = -1
+        to_city = -1
+        for i in range(len(dist_matrix)): 
+            for j in range(len(dist_matrix[i])): 
+                if dist_matrix[i][j] < min_dist: 
+                    if isValidEdge(i, j, vertexInMST): 
+                        min_dist = dist_matrix[i][j] 
+                        from_city = i 
+                        to_city = j 
+  
+        if from_city != -1 and to_city != -1: 
+            mst_connections[from_city].append(to_city)
+            mst_connections[to_city].append(from_city) 
+            num_of_edges_added += 1
+            vertexInMST[to_city] = vertexInMST[from_city] = 1
 
+    return mst_connections
 
+def get_odd_vertices(mstStruc):
+    oddVertices = []
+    for v in mstStruc:
+        if len(mstStruc[v])%2 != 0:
+            oddVertices.append(v)
 
+    return oddVertices
 
+def min_weight_perfect_match(dist_matrix, oddVertices, max_it):
 
+    matchings = []
+    matchings_cost = 0
+    availVertices = copy.deepcopy(oddVertices)
+    # random.shuffle(availVertices)
+    while availVertices:
+        chosen_vertex = availVertices.pop()
+        shortest_dist = float('inf')
+        for remaining_vertex in availVertices:
+            if dist_matrix[chosen_vertex][remaining_vertex] < shortest_dist:
+                chosen_neighbor = remaining_vertex
+        matchings.append((chosen_vertex, chosen_neighbor))
+        availVertices.remove(chosen_neighbor)
 
+    return matchings
 
+def union(mst, matchings):
+    for matching in matchings:
+        nodeA = matching[0]
+        nodeB = matching[1]
+        mst[nodeA].append(nodeB)
+        mst[nodeB].append(nodeA)
 
+def getTourLength(tour, dist_matrix, num_cities):
+    edge_count = 1
+    city1 = 0
+    city2 = 1
+    tour_length = 0
+    while edge_count <= num_cities-1:
+        tour_length += dist_matrix[tour[city1]][tour[city2]]
+        edge_count += 1
+        city1 += 1
+        city2 += 1
 
+    return tour_length + dist_matrix[tour[city2-1]][tour[0]]
 
+class EulerianCircuit:
+    def __init__(self, no_of_vertices, mst_connections):
+        self.no_of_vertices = no_of_vertices
+        self.graph = mst_connections
+        self.tourMap = []
 
+    def remove_edge(self, v1, v2):
+        if v2 in self.graph[v1]:
+            self.graph[v1].remove(v2)
 
+        if v1 in self.graph[v2]:
+            self.graph[v2].remove(v1)
 
+    def DFS(self, vertex, visited):
+        vertex_count = 1
+        visited[vertex] = True
+        for i in self.graph[vertex]:
+            if not visited[i]: 
+                vertex_count = 1 + self.DFS(i, visited)
+        return vertex_count
 
+    def isValidEdge(self, v1, v2):
+        if len(self.graph[v1]) == 1:
+            return True
+
+        else:
+            visited = [False]*self.no_of_vertices
+            c1 = self.DFS(v1, visited)
+
+            self.remove_edge(v1, v2)
+            visited = [False]*self.no_of_vertices
+            c2 = self.DFS(v1, visited)
+
+            self.graph[v1].append(v2)
+            self.graph[v2].append(v1)
+
+            if c1 > c2:
+                return False
+            
+            return True
+
+    def traverseTour(self, start):
+        for next_vertex in self.graph[start]:
+            if self.isValidEdge(start, next_vertex):
+                self.tourMap.append(start)
+                self.remove_edge(start, next_vertex)
+                self.traverseTour(next_vertex)
+
+    def tourInit(self):
+        start = 0
+        for i in range(self.no_of_vertices):
+            if len(self.graph[i]) %2 != 0:
+                start = i
+                break
+        self.traverseTour(start)
+
+def christofides_algorithm(dist_matrix, num_cities):
+    MST = primMST(dist_matrix, num_cities)
+    # print(f'\nMST connections: {MST}')
+    oddVertices = get_odd_vertices(MST)
+    # print(f'\nList of odd vertices: {oddVertices}')
+    matchings = min_weight_perfect_match(dist_matrix, oddVertices, 10000)
+    # print(f'\nMinimum weight perfect matchings: {matchings}')
+    union(MST, matchings)
+    # print(f'\nMatching union MST: {MST}')
+    euler_tour = EulerianCircuit(num_cities, MST)
+    euler_tour.tourInit()
+    tour = euler_tour.tourMap
+    # print(f'\nTour: {tour}')
+    tour = list(dict.fromkeys(tour).keys()) # remove repeated vertices
+    tour_length = getTourLength(tour, dist_matrix, num_cities)
+    # print(f'Tour length: {tour_length}')
+    return tour, tour_length
+
+tour, tour_length = christofides_algorithm(dist_matrix, num_cities)
 
 
 ############

@@ -11,9 +11,7 @@
 import os
 import sys
 import time
-# import random
 from collections import defaultdict
-import numpy as np
 
 ############
 ############ NOW PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -147,7 +145,7 @@ def read_in_algorithm_codes_and_tariffs(alg_codes_file):
 ############ THE CITY FILE IS IN THE FOLDER 'city-files'.
 ############
 
-input_file = "AISearchfile058.txt"
+input_file = "AISearchfile048.txt"
 
 ############
 ############ PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -297,88 +295,105 @@ def nearestNeighbour(dist_matrix, num_cities, start_city):
     return tour_length
 
 def probability(i, candidate_tour, dist_matrix, num_cities, pheromone_levels):
-    alpha = 2
+    alpha = 1
     beta = 5 # between 2 and 5 is recommended
     numerator = 0
     denominator = 0
-    probability_to_next_city = np.zeros(num_cities)
+    probability_to_next_city = [0]*num_cities
 
     for j in range(num_cities): # j is next possible city
-        if j in candidate_tour: # ignores visited cities
+        if j in candidate_tour or i == j: # ignores visited cities
             continue
-        numerator = (pheromone_levels[i][j]**alpha) * ((1/dist_matrix[i][j])**beta)
+        if dist_matrix[i][j] == 0:
+            dist = 1
+        else:
+            dist = dist_matrix[i][j]
+        numerator = (pheromone_levels[i][j]**alpha) * ((1/dist)**beta)
         for m in range(num_cities):
             if m in candidate_tour or m == i:
                 continue
-            denominator += (pheromone_levels[i][m]**alpha) * ((1/dist_matrix[i][m])**beta)
+            if dist_matrix[i][m] == 0:
+                cost = 1
+            else:
+                cost = dist_matrix[i][m]
+            denominator += (pheromone_levels[i][m]**alpha) * ((1/cost)**beta)
         probability_to_next_city[j] = numerator / denominator
 
     return probability_to_next_city
 
 def ACO(dist_matrix, num_cities, max_it, num_of_ant, tau_0):
-    pheromone_levels = np.array([[tau_0]*num_cities]*num_cities)
-    np.fill_diagonal(pheromone_levels, 0)
+    pheromone_levels = [[tau_0]*num_cities]*num_cities
+    # check if need fill diagonal
     phi = 0.5
     best_tour = []
-    best_tour_length = float('inf')
+    best_tour_length = sys.maxsize
 
     t = 0
-    while t < max_it:
-        candidate_tours = defaultdict(list)
-        candidate_tour_distances = defaultdict()
-        for k in range(num_of_ant): # for each ant (also assume that each ant starts at the city numbered by its position)
-            candidate_tour = [k]
-            candidate_tour_len = 0
-            i = k # i is current city
-            while(len(candidate_tour) < num_cities):
-                probability_to_next_city = probability(i, candidate_tour, dist_matrix, num_cities, pheromone_levels)
-                largest_prob = np.max(probability_to_next_city[np.nonzero(probability_to_next_city)])
-                next_city = list(probability_to_next_city).index(largest_prob)
-                candidate_tour.append(next_city)
-                candidate_tour_len += dist_matrix[i][next_city]
-                i = next_city
-            candidate_tour_len += dist_matrix[i][candidate_tour[0]] # adding on distance from final city to start city
-            candidate_tours[k] = candidate_tour
-            candidate_tour_distances[k] = candidate_tour_len
-        
-        ## Checks if improved solution is found ##
-        min_dist = min(candidate_tour_distances.values())
-        if min_dist < best_tour_length:
-            min_dist_tour = [tour_num for tour_num in candidate_tour_distances if candidate_tour_distances[tour_num] == min_dist][0]
-            best_tour = candidate_tours[min_dist_tour]
-            best_tour_length = min_dist
-        ##########################################
 
-        ## deposit/evaporate pheromone on edges ##
-        overall_change_in_pheromone = 0
-        for m in range(len(pheromone_levels)):
-            for n in range(len(pheromone_levels[m])):
-                if m == n:
-                    continue
-                for k in range(num_of_ant):
-                    # check if edge exists in k-th ant's tour
-                    if candidate_tours[k].index(n) - candidate_tours[k].index(m) == 1:
-                        overall_change_in_pheromone += (1/candidate_tour_distances[k])
+    try:
+        while t < max_it:
+            candidate_tours = defaultdict(list)
+            candidate_tour_distances = defaultdict()
+            count = 0
+            for k in range(num_of_ant): # for each ant (also assume that each ant starts at the city numbered by its position)
+                if count >= num_cities:
+                    count = 0
+                candidate_tour = [count]
+                candidate_tour_len = 0
+                i = count # i is current city
+                while(len(candidate_tour) < num_cities):
+                    probability_to_next_city = probability(i, candidate_tour, dist_matrix, num_cities, pheromone_levels)
+                    largest_prob = max(probability_to_next_city)
+                    next_city = list(probability_to_next_city).index(largest_prob)
+                    candidate_tour.append(next_city)
+                    candidate_tour_len += dist_matrix[i][next_city]
+                    i = next_city
+                candidate_tour_len += dist_matrix[i][candidate_tour[0]] # adding on distance from final city to start city
+                candidate_tours[k] = candidate_tour
+                candidate_tour_distances[k] = candidate_tour_len
+                count += 1
+            
+            ## Checks if improved solution is found ##
+            min_dist = min(candidate_tour_distances.values())
+            if min_dist < best_tour_length:
+                min_dist_tour = [tour_num for tour_num in candidate_tour_distances if candidate_tour_distances[tour_num] == min_dist][0]
+                best_tour = candidate_tours[min_dist_tour]
+                best_tour_length = min_dist
+            ##########################################
 
-                pheromone_levels[m][n] = (1-phi)*pheromone_levels[m][n] + overall_change_in_pheromone
-        ##########################################
+            ## deposit/evaporate pheromone on edges ##
+            
+            for m in range(len(pheromone_levels)):
+                for n in range(len(pheromone_levels[m])):
+                    overall_change_in_pheromone = 0
+                    if m == n:
+                        continue
+                    for k in range(num_of_ant):
+                        # check if edge exists in k-th ant's tour
+                        if candidate_tours[k].index(n) - candidate_tours[k].index(m) == 1:
+                            overall_change_in_pheromone += (1/candidate_tour_distances[k])
 
-        t += 1
+                    pheromone_levels[m][n] = (1-phi)*pheromone_levels[m][n] + overall_change_in_pheromone
+            ##########################################
 
-    return best_tour, best_tour_length
+            t += 1
 
-# tour_lengths = []
-# for _ in range(num_cities):
-#     tour_lengths.append(nearestNeighbour(dist_matrix, num_cities, _))
+        return best_tour, best_tour_length
 
-# tour_length = nearestNeighbour(dist_matrix, num_cities, random.randint(0,num_cities-1)) # using a random int decider for now to reduce time complexity
+    except:
+        return best_tour, best_tour_length
 
 tour_length = nearestNeighbour(dist_matrix, num_cities, 0)
-num_of_ant = num_cities # this can be changed 
+# if num_cities < 50:
+#     num_of_ant = num_cities
+#     max_it = 22
+# else:
+#     num_of_ant = 45
+#     max_it = 3
+num_of_ant = num_cities
+max_it = 20
 tau_0 = num_of_ant / tour_length  # initial pheromone level
-tour, tour_length = ACO(dist_matrix, num_cities, 10, num_of_ant, tau_0)
-print(f'\nTour: {tour}\nTour Length: {tour_length}\n')
-
+tour, tour_length = ACO(dist_matrix, num_cities, max_it, num_of_ant, tau_0)
 
 ############
 ############ YOUR CODE SHOULD NOW BE COMPLETE AND WHEN EXECUTION OF THIS PROGRAM 'skeleton.py'
@@ -431,21 +446,21 @@ if tour_length != check_tour_length:
     sys.exit()
 print("You, user " + my_user_name + ", have successfully built a tour of length " + str(tour_length) + "!")
 
-# local_time = time.asctime(time.localtime(time.time()))
-# output_file_time = local_time[4:7] + local_time[8:10] + local_time[11:13] + local_time[14:16] + local_time[17:19]
-# output_file_time = output_file_time.replace(" ", "0")
-# script_name = os.path.basename(sys.argv[0])
-# if len(sys.argv) > 2:
-#     output_file_time = sys.argv[2]
-# output_file_name = script_name[0:len(script_name) - 3] + "_" + input_file[0:len(input_file) - 4] + "_" + output_file_time + ".txt"
+local_time = time.asctime(time.localtime(time.time()))
+output_file_time = local_time[4:7] + local_time[8:10] + local_time[11:13] + local_time[14:16] + local_time[17:19]
+output_file_time = output_file_time.replace(" ", "0")
+script_name = os.path.basename(sys.argv[0])
+if len(sys.argv) > 2:
+    output_file_time = sys.argv[2]
+output_file_name = script_name[0:len(script_name) - 3] + "_" + input_file[0:len(input_file) - 4] + "_" + output_file_time + ".txt"
 
-# f = open(output_file_name,'w')
-# f.write("USER = " + my_user_name + " (" + my_first_name + " " + my_last_name + "),\n")
-# f.write("ALGORITHM CODE = " + algorithm_code + ", NAME OF CITY-FILE = " + input_file + ",\n")
-# f.write("SIZE = " + str(num_cities) + ", TOUR LENGTH = " + str(tour_length) + ",\n")
-# f.write(str(tour[0]))
-# for i in range(1,num_cities):
-#     f.write("," + str(tour[i]))
-# f.write(",\nNOTE = " + added_note)
-# f.close()
-# print("I have successfully written your tour to the tour file:\n   " + output_file_name + ".")
+f = open(output_file_name,'w')
+f.write("USER = " + my_user_name + " (" + my_first_name + " " + my_last_name + "),\n")
+f.write("ALGORITHM CODE = " + algorithm_code + ", NAME OF CITY-FILE = " + input_file + ",\n")
+f.write("SIZE = " + str(num_cities) + ", TOUR LENGTH = " + str(tour_length) + ",\n")
+f.write(str(tour[0]))
+for i in range(1,num_cities):
+    f.write("," + str(tour[i]))
+f.write(",\nNOTE = " + added_note)
+f.close()
+print("I have successfully written your tour to the tour file:\n   " + output_file_name + ".")

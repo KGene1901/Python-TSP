@@ -12,8 +12,8 @@ import os
 import sys
 import time
 import random
-import numpy as np
-from collections import defaultdict
+from collections import defaultdict, Counter
+import copy
 
 ############
 ############ NOW PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -147,7 +147,7 @@ def read_in_algorithm_codes_and_tariffs(alg_codes_file):
 ############ THE CITY FILE IS IN THE FOLDER 'city-files'.
 ############
 
-input_file = "AISearchfile535.txt"
+input_file = "AISearchfile048.txt"
 
 ############
 ############ PLEASE SCROLL DOWN UNTIL THE NEXT BLOCK OF CAPITALIZED COMMENTS.
@@ -276,35 +276,75 @@ added_note = ""
 ############ NOW YOUR CODE SHOULD BEGIN.
 ############
 
-'''
-Steps for Christofides Alg:
+## Kruskal's Alg ##
+def getKey(tup):
+    return tup[2]
 
-Find a minimum spanning tree (T)
-Find vertexes in T with odd degree (O)
-Find minimum weight matching (M) edges to T
-Build an Eulerian circuit using the edges of M and T
-Make a Hamiltonian circuit by skipping repeated vertexes
-'''
+def find_root(parent, vertex):
+    if parent[vertex] == vertex:
+        return vertex
+    return find_root(parent, parent[vertex])
 
+def node_union(parent, rank, x, y):
+    root_of_x = find_root(parent, x)
+    root_of_y = find_root(parent, y)
+    if rank[root_of_x] < rank[root_of_y]:
+        parent[root_of_x] = root_of_y
+    elif rank[root_of_x] > rank[root_of_y]:
+        parent[root_of_y] = root_of_x
+    else:
+        parent[root_of_y] = root_of_x
+        rank[root_of_x] += 1
+
+def kruskalMST(dist_matrix, num_cities):
+    mst_connections = defaultdict(list)
+    index = 0
+    edge_count = 0
+    edges = []
+    parent = [city for city in range(num_cities)]
+    rank = [0]*num_cities
+
+    for i in range(len(dist_matrix)): 
+            for j in range(len(dist_matrix[i])):
+                if i != j:
+                    edges.append((i, j, dist_matrix[i][j]))
+
+    edges = sorted(edges, key=getKey)
+    while edge_count < num_cities - 1:
+        from_city, to_city, dist = edges[index]
+        index += 1
+        x = find_root(parent, from_city)
+        y = find_root(parent, to_city)
+        if x != y:
+            edge_count += 1
+            mst_connections[from_city].append(to_city)
+            mst_connections[to_city].append(from_city)
+            node_union(parent, rank, x, y)
+
+    return mst_connections
+###################
+
+## Prim's Alg ##
 def isValidEdge(city1, city2, vertexInMST): 
     if city1 == city2: 
         return 0
     if (vertexInMST[city1] == 0 and vertexInMST[city2] == 0) or (vertexInMST[city1] == 1 and vertexInMST[city2] == 1): 
         return 0
     return 1
-  
-def primMST(dist_matrix, num_cities): 
+
+def primMST(dist_matrix, num_cities, starting_city): 
     mst_connections = defaultdict(list)
     vertexInMST = [0] * num_cities 
-    vertexInMST[0] = 1
     num_of_edges_added = 0
-    while num_of_edges_added < num_cities-1: 
+    vertexInMST[starting_city] = 1
+    
+    while num_of_edges_added < num_cities-1:
         min_dist = sys.maxsize
         from_city = -1
         to_city = -1
         for i in range(len(dist_matrix)): 
             for j in range(len(dist_matrix[i])): 
-                if dist_matrix[i][j] < min_dist: 
+                if dist_matrix[i][j] < min_dist:
                     if isValidEdge(i, j, vertexInMST): 
                         min_dist = dist_matrix[i][j] 
                         from_city = i 
@@ -317,32 +357,264 @@ def primMST(dist_matrix, num_cities):
             vertexInMST[to_city] = vertexInMST[from_city] = 1
 
     return mst_connections
+################
 
 def get_odd_vertices(mstStruc):
-    oddVertices = []
-    for v in mstStruc:
-        if len(mstStruc[v])%2 != 0:
-            oddVertices.append(v)
+    return [v for v in mstStruc if len(mstStruc[v])%2 != 0]
 
-    return oddVertices
+# class City(object):
+#     count = 0 
 
-def min_weight_perfect_match(dist_matrix, oddVertices):
+#     def __init__(self):
+#         self.name = City.count
+#         City.count += 1
+#         self.neighbors = []
+#         self.match = None
+#         self.mark = False
+#         self.parent = None
+#         self.root = None
+
+#     def path_to_root(self):
+#         path = [self]
+#         city_node = self
+#         while city_node != city_node.root:
+#             city_node = city_node.parent
+#             path.append(city_node)
+#         return path
+
+#     def get_aug_path_on_cycle(self, match_node, cycle):
+#         i = cycle.index(self)
+#         j = cycle.index(match_node)
+#         path = []
+
+#         if (i > 0 and j == i - 1) or (i == 0 and j == len(cycle) - 1):
+#             cycle_rev = cycle[i::-1] + cycle[:i:-1]
+#             for node in cycle_rev:
+#                 path.append(node)
+#                 if node.match not in cycle_rev:
+#                     return path
+
+#         else:
+#             cycle_forward = cycle[i::] + cycle[:i]
+#             for node in cycle_forward:
+#                 path.append(node)
+#                 if node.match not in cycle_forward:
+#                     # return path
+
+# class Supercity(City):
+#     def __init__(self, cycle=None):
+#         super(Supercity, self).__init__()
+#         self.cycle = cycle
+
+#     def shrink_cycle_to_vertex(self, nodes):
+#         nodes = [node for node in nodes if node not in self.cycle]
+#         nodes.append(self)
+
+#         for node in self.cycle:
+#             if node.match and node.match not in self.cycle:
+#                 self.match = node.match
+#             for neighbor in node.neighbors:
+#                 if neighbor not in self.cycle:
+#                     self.neighbors.append(neighbor)
+#         self.neighbors = list(set(self.neighbors))
+
+#         for node in nodes:
+#             if node.match in self.cycle:
+#                 node.match = self
+#             node.neighbors = [neighbor for neighbor in node.neighbors if neighbor not in self.cycle]
+#             if node in self.neighbors:
+#                 node.neighbors.append(self)
+
+#         return nodes
+
+#     def expand_nodes_into_cycle(self, nodes):
+#         nodes = [node for node in nodes if node is not self]
+#         for node in nodes:
+#             node.neighbors = [neighbor for neighbor in node.neighbors if neighbor is not self]
+
+#         for node in self.cycle:
+#             nodes.append(node)
+#             if node.match and node.match not in self.cycle:
+#                 node.match.match = node
+#             for neighbor in node.neighbors:
+#                 if neighbor not in self.cycle:
+#                     neighbor.neighbors.append(node)
+
+#         return nodes
+
+#     def expand_path(self, path, cycle):
+#         if self not in path:
+#             return path
+
+#         elif self == path[0]:
+#             for node in cycle:
+#                 if path[1] in node.neighbors:
+#                     if node.match:
+#                         cpath = node.get_aug_path_on_cycle(node.match, cycle)
+#                     else:
+#                         cpath = [node]
+#                     return cpath[::-1] + path[1:]
+
+#         elif self == path[-1]:
+#             for node in cycle:
+#                 if path[-2] in node.neighbors:
+#                     if node.match:
+#                         cpath = node.get_aug_path_on_cycle(node.match, cycle)
+#                     else:
+#                         cpath = [node]
+#                     return path[:-1] + cpath
+
+#         else:
+#             idx = path.index(self)
+#             if path.index(self.match) == idx - 1:
+#                 for node in cycle:
+#                     if path[idx + 1] in node.neighbors:
+#                         cpath = node.get_aug_path_on_cycle(node.match, cycle)
+#                         return path[:idx] + cpath[::-1] + path[idx + 1 :]
+
+#             elif path.index(self.match) == idx + 1:
+#                 for node in cycle:
+#                     if path[idx - 1] in node.neighbors:
+#                         cpath = node.get_aug_path_on_cycle(node.match, cycle)
+#                         return path[:idx] + cpath + path[idx + 1 :]
+
+# class EdmondsBlossomGraph:
+
+#     def __init__(self):
+#         self.nodes = None
+
+#     def reset(self):
+#         for index in self.nodes:
+#             self.nodes[index].mark = False
+#             self.nodes[index].parent = None
+#             self.nodes[index].root = None
+
+#     def get_connected_city_pairs(self):
+#         matchings = []
+#         available_nodes = [i for i in range(len(self.nodes))]
+#         for index in self.nodes:
+#             if self.nodes[index].match and self.nodes[index].name in available_nodes:
+#                 matchings.append((self.nodes[index].name, self.nodes[index].match.name))
+#                 available_nodes.remove(self.nodes[index].name)
+#                 available_nodes.remove(self.nodes[index].match.name)
+#         return matchings
+
+#     def get_max_matching(self):
+#         path = self.augment_path()
+#         if not path:
+#             return self
+#         else:
+#             self.augment_matching(path)
+#             return self.get_max_matching()
+
+#     def augment_path(self):
+#         self.reset()
+
+#         exposed_nodes = [node for node in self.nodes.values() if node.match is None]
+#         for node in exposed_nodes:
+#             node.parent = node
+#             node.root = node
+
+#         for node in exposed_nodes:
+#             if not node.mark:
+#                 for neighbor in node.neighbors:
+#                     # if self.edges[tuple(sorted([node.name, neighbor.name]))]:
+#                     if neighbor not in exposed_nodes:
+#                         neighbor.parent = node
+#                         neighbor.root = node.root
+#                         neighbor.mark = True  # odd distance from root
+#                         # self.mark_edges(node, neighbor)
+#                         exposed_nodes.append(neighbor)
+
+#                         match = neighbor.match
+#                         match.parent = neighbor
+#                         match.root = neighbor.root
+#                         # self.mark_edges(neighbor, adj_match)
+#                         exposed_nodes.append(match)
+#                     else:
+#                         if not (len(neighbor.path_to_root()) % 2):
+#                             # self.mark_edges(node, neighbor)
+#                             pass
+#                         else:
+#                             if node.root != neighbor.root:
+#                                 path1 = node.path_to_root()
+#                                 path2 = neighbor.path_to_root()
+#                                 return path1[::-1] + path2
+#                             else:
+#                                 return self.blossom(node, neighbor)
+#                 node.mark = True
+
+#         return []
+
+#     def blossom(self, node1, node2):
+#         path1 = node1.path_to_root()
+#         path2 = node2.path_to_root()
+#         cycle = path1[::-1] + path2[:-1]
+
+#         # Contract cycle nodes to supernode
+#         supercity = Supercity(cycle)
+#         node_list = supercity.shrink_cycle_to_vertex(self.nodes.values())
+#         self.nodes = {node.name: node for node in node_list}
+#         # self.compute_edges()
+#         aug_path = self.augment_path()
+
+#         # Expand supernode back to original cycle nodes
+#         aug_path = supercity.expand_path(aug_path, cycle)
+#         node_list = supercity.expand_nodes_into_cycle(self.nodes.values())
+#         self.nodes = {node.name: node for node in node_list}
+#         # self.compute_edges()
+
+#         return aug_path
+
+#     def augment_matching(self, path):
+#         for count, city in enumerate(path):
+#             if (count + 1) % 2:
+#                 city.match = path[count + 1]
+#             else:
+#                 city.match = path[count - 1]
+
+# def edmondBlossomAlg(oddVertices):
+#     matchings = {}
+#     list_of_cities = [City() for _ in oddVertices]
+#     for count, city in enumerate(oddVertices):
+#         list_of_cities[count].neighbors = [city for city in list_of_cities if city != list_of_cities[count]]
+#     EB_Graph = EdmondsBlossomGraph() 
+#     EB_Graph.nodes = {city.name: city for city in list_of_cities}
+#     EB_Graph.get_max_matching()
+#     matchings = EB_Graph.get_connected_city_pairs()
+    
+#     return matchings
+
+def minWeightPerfectMatch(oddVertices, dist_matrix):
     matchings = []
-    random.shuffle(oddVertices)
+    available_nodes = copy.deepcopy(oddVertices)
 
-    while oddVertices:
-        chosen_vertex = oddVertices.pop()
-        shortest_dist = float('inf')
-        for remaining_vertex in oddVertices:
-            if dist_matrix[chosen_vertex][remaining_vertex] < shortest_dist:
-                chosen_neighbor = remaining_vertex
-                shortest_dist = dist_matrix[chosen_vertex][remaining_vertex]
-        matchings.append((chosen_vertex, chosen_neighbor))
-        oddVertices.remove(chosen_neighbor)
+    while available_nodes:
+
+        current_pairings = []
+
+        for v in available_nodes:
+            smallest_dist = sys.maxsize
+            chosen_neighbour = -1
+            for neighbor in available_nodes:
+                if v == neighbor:
+                    continue
+
+                distance = dist_matrix[v][neighbor]
+                if distance < smallest_dist:
+                    smallest_dist = distance
+                    chosen_neighbour = neighbor
+
+            current_pairings.append((v, chosen_neighbour, smallest_dist))
+
+        min_pair = [pairing for pairing in current_pairings if pairing[2] == min([weight[2] for weight in current_pairings])][0]
+        matchings.append((min_pair[0], min_pair[1]))
+        available_nodes.remove(min_pair[0])
+        available_nodes.remove(min_pair[1])
 
     return matchings
 
-def union(mst, matchings):
+def graph_union(mst, matchings):
     for matching in matchings:
         nodeA = matching[0]
         nodeB = matching[1]
@@ -410,34 +682,86 @@ class EulerianCircuit:
                 self.remove_edge(start, next_vertex)
                 self.traverseTour(next_vertex)
 
-    def tourInit(self):
+    def tourInit(self, dist_matrix):
         start = 0
+        sdist = sys.maxsize
         for i in range(self.no_of_vertices):
             if len(self.graph[i]) %2 != 0:
                 start = i
                 break
+
         self.traverseTour(start)
 
+def remove_repeated_vertices(tour, dist_matrix):
+    final_tour = [-1]*len(tour)
+    occurence = Counter(tour)
+    count = 0
+    city = 0
+
+    while count < len(tour):
+        comparisons = []
+        if occurence[tour[city]] > 1:
+            for i in range(len(tour)):
+                if tour[i] == tour[city]:
+                    if i == len(tour) - 1:
+                        _tup = (i-1, i, 0)
+                    else:
+                        _tup = (i-1, i, i+1)
+                    comparisons.append(_tup)
+            smallest_dist = sys.maxsize
+            smallest_tup = ()
+            for tup in comparisons:
+                dist = dist_matrix[tour[tup[0]]][tour[tup[1]]] + dist_matrix[tour[tup[1]]][tour[tup[2]]]
+                if dist < smallest_dist:
+                    smallest_dist = dist
+                    smallest_tup = tup
+            final_tour[smallest_tup[1]] = tour[city]
+
+        else:
+            final_tour[city] = (tour[city])
+
+        city += 1
+        count += 1
+
+    return [city for city in final_tour if city != -1]
+
 def christofides_algorithm(dist_matrix, num_cities):
-    MST = primMST(dist_matrix, num_cities)
-    # print(f'\nMST connections: {MST}')
-    oddVertices = get_odd_vertices(MST)
-    # print(f'\nList of odd vertices: {oddVertices}')
-    matchings = min_weight_perfect_match(dist_matrix, oddVertices)
-    # print(f'\nMinimum weight perfect matchings: {matchings}')
-    union(MST, matchings)
-    # print(f'\nMatching union MST: {MST}')
-    euler_tour = EulerianCircuit(num_cities, MST)
-    euler_tour.tourInit()
-    tour = euler_tour.tourMap
-    # print(f'\nTour: {tour}')
-    tour = list(dict.fromkeys(tour).keys()) # remove repeated vertices
-    tour_length = getTourLength(tour, dist_matrix, num_cities)
-    # print(f'Tour length: {tour_length}')
-    return tour, tour_length
+    best_tour = []
+    best_length = sys.maxsize
+    for _ in range(num_cities+1):
+        tour = []
+        tour_length = 0
+
+        if _ < num_cities:
+            MST = primMST(dist_matrix, num_cities, _)
+        else:
+            MST = kruskalMST(dist_matrix, num_cities)
+        # # print(f'\nMST connections: {MST}')
+        oddVertices = get_odd_vertices(MST)
+        # print(f'\nList of odd vertices: {oddVertices}')
+        # matchings = edmondBlossomAlg(oddVertices)
+        # matchings = [(oddVertices[matchings[i][0]], oddVertices[matchings[i][1]]) for i in range(len(matchings))]
+        matchings = minWeightPerfectMatch(oddVertices, dist_matrix)
+        # print(f'\nMinimum weight perfect matchings: {matchings}')
+        graph_union(MST, matchings)
+        # print(f'\nMatching union MST: {MST}')
+        euler_tour = EulerianCircuit(num_cities, MST)
+        euler_tour.tourInit(dist_matrix)
+        tour = euler_tour.tourMap
+        # print(f'\nTour: {tour}')
+        tour = remove_repeated_vertices(tour, dist_matrix)
+        # print(f'\nTour updated: {tour}')
+        tour_length = getTourLength(tour, dist_matrix, num_cities)
+        # print(f'Tour length: {tour_length}')
+
+        if tour_length < best_length:
+            best_length = tour_length
+            best_tour = tour
+
+    return best_tour, best_length
 
 tour, tour_length = christofides_algorithm(dist_matrix, num_cities)
-
+# kruskalMST(dist_matrix, num_cities)
 
 ############
 ############ YOUR CODE SHOULD NOW BE COMPLETE AND WHEN EXECUTION OF THIS PROGRAM 'skeleton.py'
